@@ -4,10 +4,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
-#ifndef _MJSYNC_TINYWIN_HPP_
-#define _MJSYNC_TINYWIN_HPP_
+#ifndef _MJSYNC_DETAILS_TINYWIN_HPP_
+#define _MJSYNC_DETAILS_TINYWIN_HPP_
 
 #define WIN32_LEAN_AND_MEAN
 #define NOSERVICE
 #include <Windows.h>
-#endif // _MJSYNC_TINYWIN_HPP_
+#endif // _MJSYNC_DETAILS_TINYWIN_HPP_

@@ -248,7 +248,7 @@ namespace mjsync {
         inline size_t _Hardware_concurrency() noexcept {
             SYSTEM_INFO _Info = {0};
             ::GetSystemInfo(&_Info);
-#ifdef _M_X642
+#ifdef _M_X64
             return static_cast<size_t>(_Info.dwNumberOfProcessors);
 #else // ^^^ _M_X64 ^^^ / vvv _M_IX86 vvv
             return _Info.dwNumberOfProcessors;

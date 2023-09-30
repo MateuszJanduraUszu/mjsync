@@ -6,6 +6,7 @@
 #pragma once
 #ifndef _MJSYNC_DETAILS_UTILS_HPP_
 #define _MJSYNC_DETAILS_UTILS_HPP_
+#include <cstdlib>
 #include <new>
 
 namespace mjsync {
@@ -21,6 +22,13 @@ namespace mjsync {
                 _Obj->~_Ty();
                 ::operator delete(static_cast<void*>(_Obj), sizeof(_Ty));
             }
+        }
+
+        [[noreturn]] inline void _Unreachable() noexcept {
+            __assume(false);
+#ifdef _DEBUG
+            ::abort();
+#endif // _DEBUG
         }
     } // namespace details
 } // namespace mjsync

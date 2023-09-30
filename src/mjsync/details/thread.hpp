@@ -29,7 +29,7 @@ namespace mjsync {
             task_priority _Priority;
         };
 
-        class _Thread_task_queue { // single-linked non-throwing priority queue
+        class _Thread_task_queue { // singly-linked non-throwing priority queue
         public:
             _Thread_task_queue() noexcept : _Mystorage(), _Mylock() {}
 
@@ -222,10 +222,7 @@ namespace mjsync {
 
                         break;
                     default:
-                        __assume(false); // unreachable
-#ifdef _DEBUG
-                        ::std::abort();
-#endif // _DEBUG
+                        details::_Unreachable();
                         break;
                     }
                 }

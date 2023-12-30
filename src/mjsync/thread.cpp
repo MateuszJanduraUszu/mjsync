@@ -3,18 +3,19 @@
 // Copyright (c) Mateusz Jandura. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include <mjsync/details/thread.hpp>
+#include <mjmem/object_allocator.hpp>
+#include <mjsync/impl/thread.hpp>
 #include <mjsync/thread.hpp>
 #include <type_traits>
 
-namespace mjsync {
-    thread::thread() noexcept : _Myimpl(::std::make_unique<details::_Thread_impl>()) {}
+namespace mjx {
+    thread::thread() : _Myimpl(::mjx::create_object<mjsync_impl::_Thread_impl>()) {}
 
-    thread::thread(thread&& _Other) noexcept : _Myimpl(_Other._Myimpl.release()) {}
+    thread::thread(thread&& _Other) noexcept : _Myimpl{_Other._Myimpl.release()} {}
 
-    thread::thread(const task _Task, void* const _Data) noexcept
-        : _Myimpl(::std::make_unique<details::_Thread_impl>(
-            details::_Thread_task{_Task, _Data, task_priority::normal})) {}
+    thread::thread(const callable _Callable, void* const _Arg) : _Myimpl() {
+        schedule_task(_Callable, _Arg);
+    }
 
     thread::~thread() noexcept {
         terminate(); // wait for the current task to finish, discard the rest
@@ -54,7 +55,7 @@ namespace mjsync {
         }
     }
 
-    bool thread::schedule_task(const task _Task, void* const _Data, const task_priority _Priority) noexcept {
+    bool thread::schedule_task(const callable _Callable, void* const _Arg, const task_priority _Priority) {
         if (!_Myimpl) {
             return false;
         }
@@ -64,12 +65,13 @@ namespace mjsync {
             return false;
         }
 
-        if (!_Myimpl->_Cache._Queue._Enqueue(details::_Thread_task{_Task, _Data, _Priority})) {
-            return false;
+        _Myimpl->_Cache._Queue._Enqueue(mjsync_impl::_Queued_task(
+            _Myimpl->_Cache._Counter._Next_id(), _Callable, _Arg, _Priority));
+        if (_State == thread_state::waiting) { // resume the thread
+            return resume();
         }
 
-        // resume the thread if it is waiting
-        return _State == thread_state::waiting ? resume() : true;
+        return true;
     }
 
     bool thread::terminate(const bool _Wait) noexcept {
@@ -92,11 +94,11 @@ namespace mjsync {
             return false;
         }
         
-        if (_Wait) { // wait for termination completion
+        if (_Wait) { // wait until terminated
             _Myimpl->_Wait_until_terminated();
         }
 
-        _Myimpl->_Tidy();
+        _Myimpl.reset();
         return true;
     }
 
@@ -132,7 +134,7 @@ namespace mjsync {
     }
 
     size_t hardware_concurrency() noexcept {
-        static const size_t _Count = details::_Hardware_concurrency();
+        static const size_t _Count = mjsync_impl::_Hardware_concurrency();
         return _Count;
     }
-} // namespace mjsync
+} // namespace mjx

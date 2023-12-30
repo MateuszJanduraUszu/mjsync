@@ -6,13 +6,14 @@
 #pragma once
 #ifndef _MJSYNC_THREAD_HPP_
 #define _MJSYNC_THREAD_HPP_
-#include <memory>
+#include <mjmem/smart_pointer.hpp>
 #include <mjsync/api.hpp>
+#include <mjsync/task.hpp>
 
-namespace mjsync {
-    namespace details {
+namespace mjx {
+    namespace mjsync_impl {
         class _Thread_impl;
-    } // namespace details
+    } // namespace mjsync_impl
 
     enum class thread_state : unsigned char {
         terminated,
@@ -20,28 +21,20 @@ namespace mjsync {
         working
     };
 
-    enum class task_priority : unsigned char {
-        idle,
-        below_normal,
-        normal,
-        above_normal,
-        real_time
-    };
-
     class _MJSYNC_API thread {
     public:
         using native_handle_type = void*;
         using id                 = unsigned int;
-        using task               = void(*)(void*);
+        using callable           = void(*)(void*);
 
-        thread() noexcept;
+        thread();
         thread(thread&& _Other) noexcept;
         ~thread() noexcept;
 
         thread(const thread&)            = delete;
         thread& operator=(const thread&) = delete;
 
-        explicit thread(const task _Task, void* const _Data) noexcept;
+        thread(const callable _Callable, void* const _Arg);
 
         thread& operator=(thread&& _Other) noexcept;
 
@@ -64,8 +57,8 @@ namespace mjsync {
         void cancel_all_pending_tasks() noexcept;
 
         // schedules a new task
-        bool schedule_task(const task _Task, void* const _Data,
-            const task_priority _Priority = task_priority::normal) noexcept;
+        bool schedule_task(const callable _Callable, void* const _Arg,
+            const task_priority _Priority = task_priority::normal);
 
         // terminates the thread (optinally waits)
         bool terminate(const bool _Wait = true) noexcept;
@@ -77,11 +70,13 @@ namespace mjsync {
         bool resume() noexcept;
 
     private:
+        friend task;
+
 #pragma warning(suppress : 4251) // C4251: _Thread_impl needs to have dll-interface
-        ::std::unique_ptr<details::_Thread_impl> _Myimpl;
+        unique_smart_ptr<mjsync_impl::_Thread_impl> _Myimpl;
     };
 
     _MJSYNC_API size_t hardware_concurrency() noexcept;
-} // namespace mjsync
+} // namespace mjx
 
 #endif // _MJSYNC_THREAD_HPP_

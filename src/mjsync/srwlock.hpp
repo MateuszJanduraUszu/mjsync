@@ -8,7 +8,7 @@
 #define _MJSYNC_SRWLOCK_HPP_
 #include <mjsync/api.hpp>
 
-namespace mjsync {
+namespace mjx {
     class _MJSYNC_API shared_lock { // slim reader/writer lock
     public:
         shared_lock() noexcept;
@@ -54,6 +54,6 @@ namespace mjsync {
     private:
         shared_lock& _Mylock;
     };
-} // namespace mjsync
+} // namespace mjx
 
 #endif // _MJSYNC_SRWLOCK_HPP_

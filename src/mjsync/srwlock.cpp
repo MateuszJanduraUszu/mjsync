@@ -3,10 +3,10 @@
 // Copyright (c) Mateusz Jandura. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include <mjsync/details/tinywin.hpp>
+#include <mjsync/impl/tinywin.hpp>
 #include <mjsync/srwlock.hpp>
 
-namespace mjsync {
+namespace mjx {
     shared_lock::shared_lock() noexcept : _Myimpl{0} {}
 
     shared_lock::~shared_lock() noexcept {}
@@ -43,4 +43,4 @@ namespace mjsync {
     shared_lock_guard::~shared_lock_guard() noexcept {
         _Mylock.unlock_shared();
     }
-} // namespace mjsync
+} // namespace mjx

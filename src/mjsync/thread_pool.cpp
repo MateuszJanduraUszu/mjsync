@@ -3,22 +3,22 @@
 // Copyright (c) Mateusz Jandura. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include <mjsync/details/thread_pool.hpp>
-#include <mjsync/details/utils.hpp>
+#include <mjsync/impl/thread_pool.hpp>
+#include <mjsync/impl/utils.hpp>
 #include <mjsync/thread_pool.hpp>
 
-namespace mjsync {
-    thread_pool::thread_pool() noexcept : _Mystate(_Closed), _Mylist(nullptr) {}
+namespace mjx {
+    thread_pool::thread_pool() noexcept : _Mylist(nullptr), _Mystate(_Closed) {}
 
     thread_pool::thread_pool(thread_pool&& _Other) noexcept
-        : _Mystate(_Other._Mystate), _Mylist(_Other._Mylist.release()) {
+        : _Mylist(_Other._Mylist.release()), _Mystate(_Other._Mystate) {
         _Other._Mystate = _Closed;
     }
 
-    thread_pool::thread_pool(const size_t _Count) noexcept : _Mystate(_Count > 0 ? _Working : _Closed),
-        _Mylist(_Count > 0 ? ::std::make_unique<details::_Thread_list>(_Count) : nullptr) {
-        if (_Mystate != _Closed && !_Mylist) { // failed to create the thread list, mark failure
-            _Mystate = _Closed;
+    thread_pool::thread_pool(const size_t _Count) : _Mylist(nullptr), _Mystate(_Closed) {
+        if (_Count > 0) { // requested non-empty pool, re-initialize
+            _Mylist.reset(::mjx::create_object<mjsync_impl::_Thread_list>(_Count));
+            _Mystate = _Working;
         }
     }
 
@@ -37,21 +37,15 @@ namespace mjsync {
     }
 
     thread* thread_pool::_Select_ideal_thread() noexcept {
-        switch (_Mystate) {
-        case _Waiting: // all threads are waiting, choose the one with the fewest pending tasks
+        if (_Mystate == _Waiting) { // all threads are waiting, choose the one with the fewest pending tasks
             return _Mylist->_Select_thread_with_fewest_pending_tasks();
-        case _Working:
-        {
+        } else {
             thread* const _Thread = _Mylist->_Select_any_waiting_thread();
-            if (_Thread) { // some thread is waiting for a task, select it
+            if (_Thread) { // waiting thread found, select it
                 return _Thread;
             } else { // no thread is waiting, choose the thread with the fewest pending tasks
                 return _Mylist->_Select_thread_with_fewest_pending_tasks();
             }
-        }
-        default:
-            details::_Unreachable();
-            return nullptr;
         }
     }
     
@@ -67,13 +61,11 @@ namespace mjsync {
         return _Mystate == _Working;
     }
 
-    size_t thread_pool::thread_count() const noexcept {
-        return _Mylist ? _Mylist->_Size() : 0;
-    }
-
     void thread_pool::close() noexcept {
-        _Mystate = _Closed;
-        _Mylist.reset();
+        if (_Mystate != _Closed) {
+            _Mystate = _Closed;
+            _Mylist.reset();
+        }
     }
 
     bool thread_pool::is_thread_in_pool(const thread::id _Id) const noexcept {
@@ -109,52 +101,46 @@ namespace mjsync {
         }
     }
 
-    bool thread_pool::increase_threads(const size_t _Count) noexcept {
-        return _Mystate != _Closed ? _Mylist->_Grow(_Count) : false;
-    }
-
-    bool thread_pool::decrease_threads(const size_t _Count) noexcept {
-        if (_Mystate == _Closed) {
-            return false;
-        }
-
-        const size_t _Size = _Mylist->_Size();
-        if (_Count > _Size) { // not enough threads
-            return false;
-        } else if (_Count == _Size) { // remove all threads and close the thread-pool
-            close();
-            return true;
-        } else {
-            return _Mylist->_Reduce(_Count);
+    void thread_pool::increase_thread_count(const size_t _Count) {
+        if (_Mystate != _Closed) {
+            _Mylist->_Grow(_Count);
         }
     }
 
-    bool thread_pool::set_thread_count(const size_t _New_count) noexcept {
-        if (_Mystate == _Closed) {
-            return false;
+    void thread_pool::decrease_thread_count(const size_t _Count) noexcept {
+        if (_Mystate != _Closed) {
+            if (_Count >= _Mylist->_Size()) { // remove all threads
+                _Mylist->_Clear();
+                _Mystate = _Closed;
+            } else { // remove some threads
+                _Mylist->_Reduce(_Count);
+            }
         }
+    }
 
-        if (_New_count == 0) { // close the thread-pool
-            close();
-            return true;
-        }
+    size_t thread_pool::thread_count() const noexcept {
+        return _Mylist ? _Mylist->_Size() : 0;
+    }
 
-        const size_t _Size = _Mylist->_Size();
-        if (_New_count > _Size) { // increase the number of threads
-            return _Mylist->_Grow(_New_count - _Size);
-        } else { // decrease the number of threads
-            return _Mylist->_Reduce(_Size - _New_count);
+    void thread_pool::thread_count(const size_t _New_count) {
+        if (_Mystate != _Closed) {
+            const size_t _Count = _Mylist->_Size();
+            if (_New_count > _Count) { // increase the number of threads
+                increase_thread_count(_New_count - _Count);
+            } else if (_New_count < _Count) { // decrease the number of threads
+                decrease_thread_count(_Count - _New_count);
+            }
         }
     }
 
     bool thread_pool::schedule_task(
-        const thread::task _Task, void* const _Data, const task_priority _Priority) noexcept {
+        const thread::callable _Callable, void* const _Arg, const task_priority _Priority) {
         if (_Mystate == _Closed) { // scheduling inactive
             return false;
         }
 
         thread* const _Thread = _Select_ideal_thread();
-        return _Thread ? _Thread->schedule_task(_Task, _Data, _Priority) : false;
+        return _Thread ? _Thread->schedule_task(_Callable, _Arg, _Priority) : false;
     }
 
     bool thread_pool::suspend() noexcept {
@@ -190,4 +176,4 @@ namespace mjsync {
         );
         return _Success;
     }
-} // namespace mjsync
+} // namespace mjx

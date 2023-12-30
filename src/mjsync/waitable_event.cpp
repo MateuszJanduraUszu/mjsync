@@ -3,19 +3,20 @@
 // Copyright (c) Mateusz Jandura. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include <mjsync/details/waitable_event.hpp>
+#include <mjsync/impl/waitable_event.hpp>
 #include <mjsync/waitable_event.hpp>
 #include <type_traits>
 
-namespace mjsync {
-    waitable_event::waitable_event() noexcept : _Myhandle(details::_Create_anonymous_waitable_event()) {}
+namespace mjx {
+    waitable_event::waitable_event() noexcept
+        : _Myhandle(mjsync_impl::_Create_anonymous_waitable_event()) {}
 
     waitable_event::waitable_event(waitable_event&& _Other) noexcept : _Myhandle(_Other._Myhandle) {
         _Other._Myhandle = nullptr;
     }
 
     waitable_event::waitable_event(const wchar_t* const _Name) noexcept
-        : _Myhandle(details::_Create_or_open_named_waitable_event(_Name)) {}
+        : _Myhandle(mjsync_impl::_Create_or_open_named_waitable_event(_Name)) {}
 
     waitable_event::waitable_event(uninitialized_event_t) noexcept : _Myhandle(nullptr) {}
 
@@ -68,4 +69,4 @@ namespace mjsync {
             ::ResetEvent(_Myhandle);
         }
     }
-} // namespace mjsync
+} // namespace mjx

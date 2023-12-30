@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <mjsync/api.hpp>
 
-namespace mjsync {
+namespace mjx {
     struct uninitialized_event_t { // tag for waitable_event's constructor
         uninitialized_event_t() noexcept = default;
     };
@@ -55,6 +55,6 @@ namespace mjsync {
     private:
         native_handle_type _Myhandle;
     };
-} // namespace mjsync
+} // namespace mjx
 
 #endif // _MJSYNC_WAITABLE_EVENT_HPP_

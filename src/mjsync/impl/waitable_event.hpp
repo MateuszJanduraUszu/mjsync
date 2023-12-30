@@ -4,12 +4,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
-#ifndef _MJSYNC_DETAILS_WAITABLE_EVENT_HPP_
-#define _MJSYNC_DETAILS_WAITABLE_EVENT_HPP_
-#include <mjsync/details/tinywin.hpp>
+#ifndef _MJSYNC_IMPL_WAITABLE_EVENT_HPP_
+#define _MJSYNC_IMPL_WAITABLE_EVENT_HPP_
+#include <mjsync/impl/tinywin.hpp>
 
-namespace mjsync {
-    namespace details {
+namespace mjx {
+    namespace mjsync_impl {
         inline void* _Create_anonymous_waitable_event() noexcept {
             return ::CreateEventW(nullptr, true, false, nullptr);
         }
@@ -24,7 +24,7 @@ namespace mjsync {
                 return nullptr;
             }
         }
-    } // namespace details
-} // namespace mjsync
+    } // namespace mjsync_impl
+} // namespace mjx
 
-#endif // _MJSYNC_DETAILS_WAITABLE_EVENT_HPP_
+#endif // _MJSYNC_IMPL_WAITABLE_EVENT_HPP_

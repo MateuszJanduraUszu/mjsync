@@ -13,6 +13,7 @@
 #include <mjsync/impl/utils.hpp>
 #include <mjsync/srwlock.hpp>
 #include <mjsync/thread.hpp>
+#include <mjsync/waitable_event.hpp>
 #include <type_traits>
 
 namespace mjx {
@@ -68,10 +69,11 @@ namespace mjx {
                 try {
                     _Callable(_Arg);
                     _Set_state(task_state::done);
-                    _Completion_event.notify();
                 } catch (...) {
                     _Set_state(task_state::interrupted);
                 }
+
+                _Completion_event.notify(); // notify regardless of the task result
             }
 
         private:
@@ -86,7 +88,7 @@ namespace mjx {
                 _Priority         = _Other._Priority;
                 _Callable         = _Other._Callable;
                 _Arg              = _Other._Arg;
-                _Other._Id        = 0;
+                _Other._Id        = task::invalid_id;
                 _Other._Priority  = task_priority::idle;
                 _Other._Callable  = nullptr;
                 _Other._Arg       = nullptr;
@@ -243,14 +245,6 @@ namespace mjx {
 
             _Thread_impl() noexcept : _Handle(nullptr), _Id(0), _Cache(thread_state::waiting) {
                 _Attach();
-            }
-
-            explicit _Thread_impl(_Queued_task&& _Task)
-                : _Handle(nullptr), _Id(0), _Cache(thread_state::working) {
-                _Cache._Queue._Enqueue(::std::move(_Task)); // schedule an immediate task
-                if (!_Attach()) {
-                    _Cache._Queue._Clear();
-                }
             }
 
             ~_Thread_impl() noexcept {

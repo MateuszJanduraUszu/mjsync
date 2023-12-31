@@ -25,12 +25,12 @@ It is written in C++17.
 To integrate MJSYNC into your project, you can include the appropriate header files
 based on your requirements:
 
-* **<mjsync/api.hpp>**: This header contains export/import macro, don't include it directly.
-* **<mjsync/async.hpp>**: This header contains asynchrounous scheduling utilities.
-* **<mjsync/srwlock.hpp>**: This header contains slim reader/writer lock (SRW Lock) utilities.
-* **<mjsync/thread.hpp>**: This header contains thread utilities.
-* **<mjsync/thread_pool.hpp>**: This header contains thread-pool utilities.
-* **<mjsync/waitable_event.hpp>**: This header contains wait-based event utilities.
+* **<mjsync/api.hpp>**: Export/import macro, don't include it directly.
+* **<mjsync/async.hpp>**: `async()` function.
+* **<mjsync/srwlock.hpp>**: Slim reader/writer lock (SRW Lock).
+* **<mjsync/thread.hpp>**: Threads management.
+* **<mjsync/thread_pool.hpp>**: `thread-pool` class.
+* **<mjsync/waitable_event.hpp>**: `waitable_event` class.
 
 ## Compatibility
 

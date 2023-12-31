@@ -55,7 +55,8 @@ namespace mjx {
         }
     }
 
-    bool thread::schedule_task(const callable _Callable, void* const _Arg, const task_priority _Priority) {
+    bool thread::schedule_task(
+        const callable _Callable, void* const _Arg, const task_priority _Priority, const bool _Resume) {
         if (!_Myimpl) {
             return false;
         }
@@ -67,7 +68,7 @@ namespace mjx {
 
         _Myimpl->_Cache._Queue._Enqueue(mjsync_impl::_Queued_task(
             _Myimpl->_Cache._Counter._Next_id(), _Callable, _Arg, _Priority));
-        if (_State == thread_state::waiting) { // resume the thread
+        if (_State == thread_state::waiting && _Resume) { // resume the thread
             return resume();
         }
 

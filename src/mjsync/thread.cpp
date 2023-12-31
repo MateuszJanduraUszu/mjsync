@@ -13,8 +13,9 @@ namespace mjx {
 
     thread::thread(thread&& _Other) noexcept : _Myimpl{_Other._Myimpl.release()} {}
 
-    thread::thread(const callable _Callable, void* const _Arg) : _Myimpl() {
-        schedule_task(_Callable, _Arg);
+    thread::thread(const callable _Callable, void* const _Arg)
+        : _Myimpl(::mjx::create_object<mjsync_impl::_Thread_impl>()) {
+        schedule_task(_Callable, _Arg); // schedule an immediate task
     }
 
     thread::~thread() noexcept {
@@ -55,24 +56,26 @@ namespace mjx {
         }
     }
 
-    bool thread::schedule_task(
+    task thread::schedule_task(
         const callable _Callable, void* const _Arg, const task_priority _Priority, const bool _Resume) {
         if (!_Myimpl) {
-            return false;
+            return task{};
         }
 
         const thread_state _State = _Myimpl->_Get_state();
         if (_State == thread_state::terminated) {
-            return false;
+            return task{};
         }
 
+        const task::id _New_id = _Myimpl->_Cache._Counter._Next_id();
         _Myimpl->_Cache._Queue._Enqueue(mjsync_impl::_Queued_task(
-            _Myimpl->_Cache._Counter._Next_id(), _Callable, _Arg, _Priority));
+            _New_id, _Callable, _Arg, _Priority));
+        task _New_task(_New_id, this);
         if (_State == thread_state::waiting && _Resume) { // resume the thread
-            return resume();
+            resume();
         }
 
-        return true;
+        return _New_task;
     }
 
     bool thread::terminate(const bool _Wait) noexcept {

@@ -57,7 +57,7 @@ namespace mjx {
         void cancel_all_pending_tasks() noexcept;
 
         // schedules a new task
-        bool schedule_task(const callable _Callable, void* const _Arg,
+        task schedule_task(const callable _Callable, void* const _Arg,
             const task_priority _Priority = task_priority::normal, const bool _Resume = true);
 
         // terminates the thread (optinally waits)

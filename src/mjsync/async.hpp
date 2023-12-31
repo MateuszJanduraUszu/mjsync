@@ -6,7 +6,7 @@
 #pragma once
 #ifndef _MJSYNC_ASYNC_HPP_
 #define _MJSYNC_ASYNC_HPP_
-#include <mjmem/object_allocator.hpp>
+#include <mjmem/smart_pointer.hpp>
 #include <mjsync/thread.hpp>
 #include <tuple>
 #include <type_traits>
@@ -21,48 +21,47 @@ namespace mjx {
             thread::callable{}, static_cast<void*>(nullptr), task_priority{}))>> = true;
 
     template <class _Sched>
-    using _Enable_if_is_scheduler = ::std::enable_if_t<_Is_scheduler<_Sched>, int>;
+    using _Enable_if_scheduler_t = ::std::enable_if_t<_Is_scheduler<_Sched>, int>;
 
     template <class _Fn, class... _Types>
     class _Task_invoker { // invokes any callable as a thread task
     public:
-        using _Tuple = ::std::tuple<::std::decay_t<_Fn>, ::std::decay_t<_Types>...>;
-
-        struct _Delete_guard {
-            void* _Ptr;
-
-            ~_Delete_guard() noexcept {
-                ::mjx::delete_object(static_cast<_Tuple*>(_Ptr));
-            }
-        };
-
-        static constexpr _Tuple* _Pack_callable(_Fn&& _Func, _Types&&... _Args) {
-            return ::mjx::create_object<_Tuple>(::std::forward<_Fn>(_Func), ::std::forward<_Types>(_Args)...);
-        }
-
-        static constexpr void _Invoker(void* const _Data) noexcept {
-            _Delete_guard _Guard{_Data}; // automatically deletes _Data
-            _Tuple& _Packed = *static_cast<_Tuple*>(_Data);
-            const _Fn _Func = ::std::forward<_Fn>(::std::get<_Fn>(_Packed));
+        template <class _Tuple, size_t... _Indices>
+        static constexpr void _Invoker(void* _Arg) noexcept {
+            // obtain _Fn and _Types... from _Arg, then invoke it
+            const unique_smart_ptr<_Tuple> _Unique(static_cast<_Tuple*>(_Arg));
+            _Tuple& _Vals = *_Unique;
             try {
-                (void) _Func(::std::forward<_Types>(::std::get<_Types>(_Packed))...); // may throw
+                ::std::invoke(::std::move(::std::get<_Indices>(_Vals))...);
             } catch (...) {
                 // don't care about the thrown exception
             }
         }
+
+        template <class _Tuple, size_t... _Indices>
+        static constexpr auto _Get_invoker(::std::index_sequence<_Indices...>) noexcept {
+            return &_Invoker<_Tuple, _Indices...>;
+        }
     };
 
-    template <class _Sched, class _Fn, class... _Types, _Enable_if_is_scheduler<_Sched> = 0>
+    template <class _Sched, class _Fn, class... _Types, _Enable_if_scheduler_t<_Sched> = 0>
     constexpr bool async(_Sched& _Scheduler, const task_priority _Priority, _Fn&& _Func, _Types&&... _Args) {
         using _Invoker_t        = _Task_invoker<_Fn, _Types...>;
-        using _Tuple_t          = typename _Invoker_t::_Tuple;
-        const auto _Invoker     = &_Invoker_t::_Invoker;
-        _Tuple_t* const _Packed = _Invoker_t::_Pack_callable(
+        using _Tuple_t          = ::std::tuple<::std::decay_t<_Fn>, ::std::decay_t<_Types>...>;
+        auto _Vals              = ::mjx::make_unique_smart_ptr<_Tuple_t>(
             ::std::forward<_Fn>(_Func), ::std::forward<_Types>(_Args)...);
-        return _Packed ? _Scheduler.schedule_task(_Invoker, _Packed, _Priority) : false;
+        constexpr auto _Invoker = _Invoker_t::_Get_invoker<_Tuple_t>(
+            ::std::make_index_sequence<1 + sizeof...(_Types)>{});
+        if (_Scheduler.schedule_task(_Invoker, _Vals.get(), _Priority)) {
+            // release ownership of _Vals, _Invoker() will destroy it
+            _Vals.release();
+            return true;
+        } else {
+            return false;
+        }
     }
 
-    template <class _Sched, class _Fn, class... _Types, _Enable_if_is_scheduler<_Sched> = 0>
+    template <class _Sched, class _Fn, class... _Types, _Enable_if_scheduler_t<_Sched> = 0>
     constexpr bool async(_Sched& _Scheduler, _Fn&& _Func, _Types&&... _Args) {
         return ::mjx::async(
             _Scheduler, task_priority::normal, ::std::forward<_Fn>(_Func), ::std::forward<_Types>(_Args)...);

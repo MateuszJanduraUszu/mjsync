@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <mjmem/smart_pointer.hpp>
 #include <mjsync/api.hpp>
+#include <mjsync/task.hpp>
 #include <mjsync/thread.hpp>
 
 namespace mjx {
@@ -67,7 +68,7 @@ namespace mjx {
         void thread_count(const size_t _New_count);
 
         // schedules a new task
-        bool schedule_task(const thread::callable _Callable, void* const _Arg,
+        task schedule_task(const thread::callable _Callable, void* const _Arg,
             const task_priority _Priority = task_priority::normal);
 
         // suspends all threads

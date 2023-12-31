@@ -133,14 +133,14 @@ namespace mjx {
         }
     }
 
-    bool thread_pool::schedule_task(
+    task thread_pool::schedule_task(
         const thread::callable _Callable, void* const _Arg, const task_priority _Priority) {
         if (_Mystate == _Closed) { // scheduling inactive
-            return false;
+            return task{};
         }
 
         thread* const _Thread = _Select_ideal_thread();
-        return _Thread ? _Thread->schedule_task(_Callable, _Arg, _Priority) : false;
+        return _Thread ? _Thread->schedule_task(_Callable, _Arg, _Priority) : task{};
     }
 
     bool thread_pool::suspend() noexcept {

@@ -6,6 +6,7 @@
 #pragma once
 #ifndef _MJSYNC_ASYNC_HPP_
 #define _MJSYNC_ASYNC_HPP_
+#include <concepts>
 #include <mjmem/smart_pointer.hpp>
 #include <mjsync/task.hpp>
 #include <mjsync/thread.hpp>
@@ -13,16 +14,11 @@
 #include <type_traits>
 
 namespace mjx {
-    template <class _Sched, class = void>
-    inline constexpr bool _Is_scheduler = false;
-
     template <class _Sched>
-    inline constexpr bool _Is_scheduler<_Sched,
-        ::std::void_t<decltype(::std::declval<_Sched&>().schedule_task(
-            thread::callable{}, static_cast<void*>(nullptr), task_priority{}))>> = true;
-
-    template <class _Sched>
-    using _Enable_if_scheduler_t = ::std::enable_if_t<_Is_scheduler<_Sched>, int>;
+    concept task_scheduler = requires(_Sched& _Scheduler) {
+        { _Scheduler.schedule_task(thread::callable{}, static_cast<void*>(nullptr), task_priority{}) }
+            -> ::std::same_as<task>;
+    };
 
     template <class _Fn, class... _Types>
     class _Task_invoker { // invokes any callable as a thread task
@@ -41,7 +37,7 @@ namespace mjx {
         }
     };
 
-    template <class _Sched, class _Fn, class... _Types, _Enable_if_scheduler_t<_Sched> = 0>
+    template <task_scheduler _Sched, class _Fn, class... _Types>
     constexpr task async(_Sched& _Scheduler, const task_priority _Priority, _Fn&& _Func, _Types&&... _Args) {
         using _Invoker_t        = _Task_invoker<_Fn, _Types...>;
         using _Tuple_t          = ::std::tuple<::std::decay_t<_Fn>, ::std::decay_t<_Types>...>;
@@ -57,7 +53,7 @@ namespace mjx {
         return _Task;
     }
 
-    template <class _Sched, class _Fn, class... _Types, _Enable_if_scheduler_t<_Sched> = 0>
+    template <task_scheduler _Sched, class _Fn, class... _Types>
     constexpr task async(_Sched& _Scheduler, _Fn&& _Func, _Types&&... _Args) {
         return ::mjx::async(
             _Scheduler, task_priority::normal, ::std::forward<_Fn>(_Func), ::std::forward<_Types>(_Args)...);

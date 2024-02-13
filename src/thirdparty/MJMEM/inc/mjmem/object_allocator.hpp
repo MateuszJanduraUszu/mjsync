@@ -53,8 +53,7 @@ namespace mjx {
         }
 
         pointer allocate_aligned(const size_type _Count, const size_type _Align) {
-            return static_cast<pointer>(
-                ::mjx::get_allocator().allocate_aligned(_Count * sizeof(_Ty), _Align));
+            return static_cast<pointer>(::mjx::get_allocator().allocate_aligned(_Count * sizeof(_Ty), _Align));
         }
 
         void deallocate(pointer _Ptr, const size_type _Count) noexcept {
@@ -71,13 +70,8 @@ namespace mjx {
     };
 
     template <class _Ty>
-    inline bool operator==(const object_allocator<_Ty>& _Left, const object_allocator<_Ty>& _Right) noexcept {
+    inline bool operator==(const object_allocator<_Ty>&, const object_allocator<_Ty>&) noexcept {
         return true;
-    }
-
-    template <class _Ty>
-    inline bool operator!=(const object_allocator<_Ty>& _Left, const object_allocator<_Ty>& _Right) noexcept {
-        return false;
     }
 
     template <class _Ty, class... _Types>
@@ -88,12 +82,14 @@ namespace mjx {
 
     template <class _Ty>
     inline void delete_object(_Ty* const _Obj) noexcept(::std::is_nothrow_destructible_v<_Ty>) {
-        if constexpr (!::std::is_trivially_destructible_v<_Ty>) {
-            _Obj->~_Ty();
-        }
+        if (_Obj) {
+            if constexpr (!::std::is_trivially_destructible_v<_Ty>) {
+                _Obj->~_Ty(); // non-trivial destructor, call it
+            }
 
-        object_allocator<_Ty> _Al;
-        _Al.deallocate(_Obj, 1);
+            object_allocator<_Ty> _Al;
+            _Al.deallocate(_Obj, 1);
+        }
     }
 
     template <class _Ty>
@@ -105,14 +101,55 @@ namespace mjx {
     template <class _Ty>
     inline void delete_object_array(
         _Ty* const _Objects, const size_t _Count) noexcept(::std::is_nothrow_destructible_v<_Ty>) {
-        if constexpr (!::std::is_trivially_destructible_v<_Ty>) {
-            for (size_t _Idx = 0; _Idx < _Count; ++_Idx) {
-                _Objects[_Idx].~_Ty();
+        if (_Objects && _Count > 0) {
+            if constexpr (!::std::is_trivially_destructible_v<_Ty>) {
+                for (size_t _Idx = 0; _Idx < _Count; ++_Idx) {
+                    _Objects[_Idx].~_Ty(); // non-trivial destructor, call it
+                }
             }
-        }
 
-        object_allocator<_Ty> _Al;
-        _Al.deallocate(_Objects, _Count);
+            object_allocator<_Ty> _Al;
+            _Al.deallocate(_Objects, _Count);
+        }
+    }
+
+    template <class _Alloc>
+    concept compatible_allocator = ::std::is_base_of_v<allocator, _Alloc>;
+
+    template <class _Ty, compatible_allocator _Alloc, class... _Types>
+    inline _Ty* create_object_using_allocator(_Alloc& _Al, _Types&&... _Args) {
+        return ::new (static_cast<void*>(_Al.allocate(sizeof(_Ty)))) _Ty(::std::forward<_Types>(_Args)...);
+    }
+
+    template <class _Ty, compatible_allocator _Alloc>
+    inline void delete_object_using_allocator(
+        _Ty* const _Obj, _Alloc& _Al) noexcept(::std::is_nothrow_destructible_v<_Ty>) {
+        if (_Obj) {
+            if constexpr (!::std::is_trivially_destructible_v<_Ty>) {
+                _Obj->~_Ty(); // non-trivial destructor, call it
+            }
+
+            _Al.deallocate(_Obj, sizeof(_Ty));
+        }
+    }
+
+    template <class _Ty, compatible_allocator _Alloc>
+    inline _Ty* allocate_object_array_using_allocator(const size_t _Count, _Alloc& _Al) {
+        return static_cast<_Ty*>(_Al.allocate(_Count * sizeof(_Ty)));
+    }
+
+    template <class _Ty, compatible_allocator _Alloc>
+    inline void delete_object_array_using_allocator(
+        _Ty* const _Objects, const size_t _Count, _Alloc& _Al) noexcept(::std::is_nothrow_destructible_v<_Ty>) {
+        if (_Objects && _Count > 0) {
+            if constexpr (!::std::is_trivially_destructible_v<_Ty>) {
+                for (size_t _Idx = 0; _Idx < _Count; ++_Idx) {
+                    _Objects[_Idx].~_Ty(); // non-trivial destructor, call it
+                }
+            }
+
+            _Al.deallocate(_Objects, _Count * sizeof(_Ty));
+        }
     }
 } // namespace mjx
 

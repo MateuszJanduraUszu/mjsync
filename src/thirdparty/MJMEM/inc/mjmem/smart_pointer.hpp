@@ -155,12 +155,6 @@ namespace mjx {
     }
 
     template <class _Ty1, class _Ty2>
-    inline bool operator!=(
-        const optimized_pair<_Ty1, _Ty2>& _Left, const optimized_pair<_Ty1, _Ty2>& _Right) {
-        return !(_Left == _Right);
-    }
-
-    template <class _Ty1, class _Ty2>
     inline optimized_pair<_Ty1, _Ty2> make_optimized_pair(_Ty1&& _Val1, _Ty2&& _Val2) noexcept(
         ::std::is_nothrow_move_constructible_v<_Ty1> && ::std::is_nothrow_move_constructible_v<_Ty2>) {
         return optimized_pair<_Ty1, _Ty2>(::std::move(_Val1), ::std::move(_Val2));
@@ -246,26 +240,6 @@ namespace mjx {
     template <class _Ty>
     inline bool operator==(const unique_smart_ptr<_Ty>& _Left, nullptr_t) noexcept {
         return !_Left;
-    }
-
-    template <class _Ty>
-    inline bool operator==(nullptr_t, const unique_smart_ptr<_Ty>& _Right) noexcept {
-        return !_Right;
-    }
-
-    template <class _Ty>
-    inline bool operator!=(const unique_smart_ptr<_Ty>& _Left, const unique_smart_ptr<_Ty>& _Right) noexcept {
-        return _Left.get() != _Right.get();
-    }
-
-    template <class _Ty>
-    inline bool operator!=(const unique_smart_ptr<_Ty>& _Left, nullptr_t) noexcept {
-        return static_cast<bool>(_Left);
-    }
-
-    template <class _Ty>
-    inline bool operator!=(nullptr_t, const unique_smart_ptr<_Ty>& _Right) noexcept {
-        return static_cast<bool>(_Right);
     }
 
     template <class _Ty, class... _Types>
@@ -389,27 +363,6 @@ namespace mjx {
     template <class _Ty>
     inline bool operator==(const unique_smart_array<_Ty>& _Left, nullptr_t) noexcept {
         return !_Left;
-    }
-
-    template <class _Ty>
-    inline bool operator==(nullptr_t, const unique_smart_array<_Ty>& _Right) noexcept {
-        return !_Right;
-    }
-
-    template <class _Ty>
-    inline bool operator!=(
-        const unique_smart_array<_Ty>& _Left, const unique_smart_array<_Ty>& _Right) noexcept {
-        return _Left.get() != _Right.get();
-    }
-
-    template <class _Ty>
-    inline bool operator!=(const unique_smart_array<_Ty>& _Left, nullptr_t) noexcept {
-        return static_cast<bool>(_Left);
-    }
-
-    template <class _Ty>
-    inline bool operator!=(nullptr_t, const unique_smart_array<_Ty>& _Right) noexcept {
-        return static_cast<bool>(_Right);
     }
 
     template <class _Ty, class... _Types>
@@ -554,26 +507,6 @@ namespace mjx {
         return !_Left;
     }
 
-    template <class _Ty>
-    inline bool operator==(nullptr_t, const smart_ptr<_Ty>& _Right) noexcept {
-        return !_Right;
-    }
-
-    template <class _Ty>
-    inline bool operator!=(const smart_ptr<_Ty>& _Left, const smart_ptr<_Ty>& _Right) noexcept {
-        return _Left.get() != _Right.get();
-    }
-
-    template <class _Ty>
-    inline bool operator!=(const smart_ptr<_Ty>& _Left, nullptr_t) noexcept {
-        return static_cast<bool>(_Left);
-    }
-
-    template <class _Ty>
-    inline bool operator!=(nullptr_t, const smart_ptr<_Ty>& _Right) noexcept {
-        return static_cast<bool>(_Right);
-    }
-
     template <class _Ty, class... _Types>
     inline smart_ptr<_Ty> make_smart_ptr(_Types&&... _Args) {
         return smart_ptr<_Ty>(::mjx::create_object<_Ty>(::std::forward<_Types>(_Args)...));
@@ -705,26 +638,6 @@ namespace mjx {
     template <class _Ty>
     inline bool operator==(const smart_array<_Ty>& _Left, nullptr_t) noexcept {
         return !_Left;
-    }
-
-    template <class _Ty>
-    inline bool operator==(nullptr_t, const smart_array<_Ty>& _Right) noexcept {
-        return !_Right;
-    }
-
-    template <class _Ty>
-    inline bool operator!=(const smart_array<_Ty>& _Left, const smart_array<_Ty>& _Right) noexcept {
-        return _Left.get() != _Right.get();
-    }
-
-    template <class _Ty>
-    inline bool operator!=(const smart_array<_Ty>& _Left, nullptr_t) noexcept {
-        return static_cast<bool>(_Left);
-    }
-
-    template <class _Ty>
-    inline bool operator!=(nullptr_t, const smart_array<_Ty>& _Right) noexcept {
-        return static_cast<bool>(_Right);
     }
 
     template <class _Ty>

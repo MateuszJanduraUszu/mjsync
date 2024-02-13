@@ -62,7 +62,6 @@ namespace mjx {
     };
 
     _MJMEM_API bool operator==(const pool_resource& _Left, const pool_resource& _Right);
-    _MJMEM_API bool operator!=(const pool_resource& _Left, const pool_resource& _Right);
 } // namespace mjx
 
 #endif // _MJMEM_POOL_RESOURCE_HPP_

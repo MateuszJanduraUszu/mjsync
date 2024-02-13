@@ -42,7 +42,6 @@ namespace mjx {
     };
 
     _MJMEM_API bool operator==(const allocator& _Left, const allocator& _Right) noexcept;
-    _MJMEM_API bool operator!=(const allocator& _Left, const allocator& _Right) noexcept;
 
     _MJMEM_API void set_allocator(allocator& _New_al) noexcept;
     _MJMEM_API allocator& get_allocator() noexcept;

@@ -15,7 +15,7 @@ namespace mjx {
         ~allocation_failure() noexcept;
 
         // raises allocation failure exception
-        __declspec(noreturn) static void raise();
+        [[noreturn]] static void raise();
     };
 
     class _MJMEM_API allocation_limit_exceeded {
@@ -24,7 +24,7 @@ namespace mjx {
         ~allocation_limit_exceeded() noexcept;
 
         // raises allocation limit exceeded exception
-        __declspec(noreturn) static void raise();
+        [[noreturn]] static void raise();
     };
 
     class _MJMEM_API resource_overrun {
@@ -33,7 +33,7 @@ namespace mjx {
         ~resource_overrun() noexcept;
 
         // raises resource overrun exception
-        __declspec(noreturn) static void raise();
+        [[noreturn]] static void raise();
     };
 } // namespace mjx
 

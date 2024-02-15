@@ -20,7 +20,9 @@ namespace mjx {
     }
 
     void shared_lock::unlock() noexcept {
-#pragma warning(suppress : 26110) // C26110: lock must be held
+#ifdef _Analysis_assume_lock_held_
+        _Analysis_assume_lock_held_(reinterpret_cast<SRWLOCK>(_Myimpl)); // avoids C26110 warning
+#endif // _Analysis_assume_lock_held_
         ::ReleaseSRWLockExclusive(reinterpret_cast<SRWLOCK*>(&_Myimpl));
     }
 

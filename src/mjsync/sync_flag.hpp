@@ -31,6 +31,7 @@ namespace mjx {
         void set(const ::std::memory_order _Order) noexcept;
 
     private:
+#pragma warning(suppress : 4251) // C4251: std::atomic needs to have dll-interface
         ::std::atomic<bool> _Myval;
     };
 } // namespace mjx

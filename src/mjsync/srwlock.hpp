@@ -17,16 +17,16 @@ namespace mjx {
         shared_lock(const shared_lock&)            = delete;
         shared_lock& operator=(const shared_lock&) = delete;
 
-        // acquires exclusive lock
+        // acquires the lock in exclusive mode
         void lock() noexcept;
 
-        // acquires shared lock
+        // acquires the lock in shared mode
         void lock_shared() noexcept;
 
-        // releases exclusive lock
+        // releases the lock that was acquired in exclusive mode
         void unlock() noexcept;
 
-        // releases shared lock
+        // releases the lock that was acquired in shared mode
         void unlock_shared() noexcept;
 
     private:

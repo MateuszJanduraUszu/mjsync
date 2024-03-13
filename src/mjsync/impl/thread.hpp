@@ -21,7 +21,7 @@ namespace mjx {
         inline void _Terminate_this_thread() noexcept {
             ::ExitThread(0);
         }
-        
+
         inline void _Suspend_this_thread() noexcept {
             ::SuspendThread(::GetCurrentThread());
         }
@@ -61,7 +61,7 @@ namespace mjx {
             _Queued_task& operator=(const _Queued_task&) = delete;
 
             bool _Should_execute() const noexcept {
-                return _State.load(::std::memory_order_relaxed) == task_state::enqueued;
+                return _State.load(::std::memory_order_acquire) == task_state::enqueued;
             }
 
             void _Execute() noexcept {
@@ -78,12 +78,12 @@ namespace mjx {
 
         private:
             void _Set_state(const task_state _New_state) noexcept {
-                _State.store(_New_state, ::std::memory_order_relaxed);
+                _State.store(_New_state, ::std::memory_order_release);
             }
 
             void _Steal_data(_Queued_task& _Other) noexcept {
                 _Id               = _Other._Id;
-                _State            = _Other._State.exchange(task_state::canceled);
+                _State            = _Other._State.exchange(task_state::canceled, ::std::memory_order_relaxed);
                 _Completion_event = ::std::move(_Other._Completion_event);
                 _Priority         = _Other._Priority;
                 _Callable         = _Other._Callable;

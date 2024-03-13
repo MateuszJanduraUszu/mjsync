@@ -103,6 +103,9 @@ namespace mjx {
                 _Clear();
             }
 
+            _Task_queue(const _Task_queue&)            = delete;
+            _Task_queue& operator=(const _Task_queue&) = delete;
+
             bool _Empty() const noexcept {
                 shared_lock_guard _Guard(_Mylock);
                 return _Mysize == 0;
@@ -235,6 +238,10 @@ namespace mjx {
 
             explicit _Thread_cache(const thread_state _Initial_state) noexcept
                 : _State(_Initial_state), _Queue(), _Counter() {}
+
+            _Thread_cache()                                = delete;
+            _Thread_cache(const _Thread_cache&)            = delete;
+            _Thread_cache& operator=(const _Thread_cache&) = delete;
         };
 
         class _Thread_impl {
@@ -250,6 +257,9 @@ namespace mjx {
             ~_Thread_impl() noexcept {
                 ::CloseHandle(_Handle);
             }
+
+            _Thread_impl(const _Thread_impl&)            = delete;
+            _Thread_impl& operator=(const _Thread_impl&) = delete;
 
             thread_state _Get_state() const noexcept {
                 return _Cache._State.load(::std::memory_order_relaxed);

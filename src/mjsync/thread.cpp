@@ -31,7 +31,7 @@ namespace mjx {
     }
 
     bool thread::joinable() const noexcept {
-        return _Myimpl ? _Myimpl->_Get_state() != thread_state::terminated : false;
+        return state() != thread_state::terminated;
     }
 
     thread::id thread::get_id() const noexcept {
@@ -43,7 +43,7 @@ namespace mjx {
     }
 
     thread_state thread::state() const noexcept {
-        return _Myimpl ? _Myimpl->_Get_state() : thread_state::terminated;
+        return _Myimpl ? _Myimpl->_Cache._State.load(::std::memory_order_relaxed) : thread_state::terminated;
     }
 
     size_t thread::pending_tasks() const noexcept {
@@ -63,78 +63,55 @@ namespace mjx {
         }
 
         const thread_state _State = _Myimpl->_Get_state();
-        if (_State == thread_state::terminated) {
+        if (_State == thread_state::terminated) { // scheduling inactive, breaj
             return task{};
         }
 
         const task::id _New_id = _Myimpl->_Cache._Counter._Next_id();
-        _Myimpl->_Cache._Queue._Enqueue(mjsync_impl::_Queued_task(
-            _New_id, _Callable, _Arg, _Priority));
+        _Myimpl->_Cache._Queue._Enqueue(mjsync_impl::_Queued_task(_New_id, _Callable, _Arg, _Priority));
         task _New_task(_New_id, this);
         if (_State == thread_state::waiting && _Resume) { // resume the thread
-            resume();
+            _Myimpl->_Set_state(thread_state::working);
+            _Myimpl->_Cache._State_event.notify();
         }
 
         return _New_task;
     }
 
-    bool thread::terminate(const bool _Wait) noexcept {
-        if (!_Myimpl) {
-            return false;
-        }
-
-        // Note: To ensure the proper termination of the thread, we suspend it first and then
-        //       set its state to "terminated". Suspending the thread is crucial for immediate
-        //       and accurate termination, as it prevents the thread from picking up another task,
-        //       which could otherwise delay termination.
-        if (_Myimpl->_Get_state() != thread_state::waiting) {
-            if (!_Myimpl->_Suspend()) {
-                return false;
-            }
-        }
-
-        _Myimpl->_Set_state(thread_state::terminated); // force the thread to terminate itself
-        if (!_Myimpl->_Resume()) {
-            return false;
-        }
-        
-        if (_Wait) { // wait until terminated
-            _Myimpl->_Wait_until_terminated();
-        }
-
-        _Myimpl.reset();
-        return true;
-    }
-
     bool thread::suspend() noexcept {
-        if (!_Myimpl || _Myimpl->_Get_state() != thread_state::working) {
+        if (!_Myimpl || _Myimpl->_Get_state() != thread_state::working) { // wrong state, break
             return false;
         }
 
-        if (!_Myimpl->_Suspend()) { // failed to suspend the thread, break
-            return false;
-        }
-
-        _Myimpl->_Set_state(thread_state::waiting); // update thread's state
+        // set the state to 'waiting', the thread will suspend itself
+        _Myimpl->_Set_state(thread_state::waiting);
         return true;
     }
 
     bool thread::resume() noexcept {
-        if (!_Myimpl || _Myimpl->_Get_state() != thread_state::waiting) {
+        if (!_Myimpl || _Myimpl->_Get_state() != thread_state::waiting) { // wrong state, break
             return false;
         }
 
-        // Note: Unlike suspend(), where the thread can be suspended directly, we must first change
-        //       the thread's state before resuming it. If the thread's routine observes that
-        //       it is in a waiting state, it may decide to suspend itself again, effectively
-        //       remaining suspended, even if we attempt to resume it manually.
+        // set the state to 'working' and notify the thread
         _Myimpl->_Set_state(thread_state::working);
-        if (_Myimpl->_Resume()) {
-            return true;
-        } else { // failed to resume the thread, restore an old state
-            _Myimpl->_Set_state(thread_state::waiting);
+        _Myimpl->_Cache._State_event.notify();
+        return true;
+    }
+    
+    bool thread::terminate() noexcept {
+        if (!_Myimpl) {
             return false;
         }
+
+        if (_Myimpl->_Exchange_state(thread_state::terminated) == thread_state::waiting) {
+            // the thread is waiting, notify it
+            _Myimpl->_Cache._State_event.notify();
+        }
+        
+        _Myimpl->_Cache._Termination_event.wait_and_reset(); // wait until terminated
+        _Myimpl.reset();
+        return true;
     }
 
     size_t hardware_concurrency() noexcept {

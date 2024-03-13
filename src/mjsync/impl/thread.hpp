@@ -18,14 +18,6 @@
 
 namespace mjx {
     namespace mjsync_impl {
-        inline void _Terminate_this_thread() noexcept {
-            ::ExitThread(0);
-        }
-
-        inline void _Suspend_this_thread() noexcept {
-            ::SuspendThread(::GetCurrentThread());
-        }
-
         class _Queued_task {
         public:
             task::id _Id;
@@ -233,11 +225,13 @@ namespace mjx {
         class _Thread_cache { // thread's internal cache
         public:
             ::std::atomic<thread_state> _State;
+            waitable_event _State_event; // event used for synchronization when state changes
+            waitable_event _Termination_event; // event used for synchronization at termination
             _Task_queue _Queue;
             _Task_counter _Counter;
 
             explicit _Thread_cache(const thread_state _Initial_state) noexcept
-                : _State(_Initial_state), _Queue(), _Counter() {}
+                : _State(_Initial_state), _State_event(), _Termination_event(), _Queue(), _Counter() {}
 
             _Thread_cache()                                = delete;
             _Thread_cache(const _Thread_cache&)            = delete;
@@ -262,39 +256,33 @@ namespace mjx {
             _Thread_impl& operator=(const _Thread_impl&) = delete;
 
             thread_state _Get_state() const noexcept {
-                return _Cache._State.load(::std::memory_order_relaxed);
+                return _Cache._State.load(::std::memory_order_acquire);
             }
 
             void _Set_state(const thread_state _New_state) noexcept {
-                _Cache._State.store(_New_state, ::std::memory_order_relaxed);
+                _Cache._State.store(_New_state, ::std::memory_order_release);
+            }
+
+            thread_state _Exchange_state(const thread_state _New_state) noexcept {
+                return _Cache._State.exchange(_New_state, ::std::memory_order_acq_rel);
             }
 
             _Queued_task* _Find_task(const task::id _Id) noexcept {
                 return _Cache._Queue._Find(_Id);
             }
 
-            void _Wait_until_terminated() noexcept {
-                ::WaitForSingleObject(_Handle, 0xFFFF'FFFF); // infinite timeout
-            }
-
-            bool _Suspend() noexcept {
-                return ::SuspendThread(_Handle) != 0xFFFF'FFFF;
-            }
-
-            bool _Resume() noexcept {
-                return ::ResumeThread(_Handle) != 0xFFFF'FFFF;
-            }
-
         private:
             static unsigned long __stdcall _Thread_routine(void* const _Data) noexcept {
                 _Thread_cache* const _Cache = static_cast<_Thread_cache*>(_Data);
-                for (;;) {
-                    switch (_Cache->_State.load(::std::memory_order_relaxed)) {
+                bool _Terminate             = false; // indicates whether termination has been requested
+                bool _Was_idle              = false; // indicates whether the thread was in an idle state
+                while (!_Terminate) {
+                    switch (_Cache->_State.load(::std::memory_order_acquire)) {
                     case thread_state::terminated: // end execution
-                        _Terminate_this_thread();
+                        _Terminate = true;
                         break;
                     case thread_state::waiting: // wait for any signal
-                        _Suspend_this_thread();
+                        _Cache->_State_event.wait_and_reset();
                         break;
                     case thread_state::working: // perform another task
                         if (!_Cache->_Queue._Empty()) {
@@ -302,8 +290,22 @@ namespace mjx {
                             if (_Task._Should_execute()) {
                                 _Task._Execute();
                             }
-                        } else { // no more tasks, wait for any
-                            _Cache->_State.store(thread_state::waiting, ::std::memory_order_relaxed);
+
+                            if (_Was_idle) { // got some task, reset the flag
+                                _Was_idle = false;
+                            }
+                        } else { // no more tasks
+                            // Note: The use of atomic operations here necessitates caution in changing the
+                            //       state, especially the first time when the thread has no tasks.
+                            //       Modifying the state in this critical section may result in a race condition,
+                            //       where a termination request is overwritten by the state change to 'waiting'.
+                            //       To prevent this, we use the _Was_idle flag to toggle the state only if the
+                            //       thread was previously in an idle state, avoiding a potential race condition.
+                            if (_Was_idle) {
+                                _Cache->_State.store(thread_state::waiting, ::std::memory_order_release);
+                            }
+
+                            _Was_idle = !_Was_idle; // toggle flag state
                         }
 
                         break;
@@ -313,6 +315,10 @@ namespace mjx {
                     }
                 }
                 
+                // Note: The termination request always originates from thread::terminate(), which subsequently
+                //       waits until the thread is fully terminated. It is crucial to notify the termination
+                //       process to prevent an indefinite wait.
+                _Cache->_Termination_event.notify();
                 return 0;
             }
 

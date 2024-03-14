@@ -334,6 +334,62 @@ namespace mjx {
             }
         };
 
+        inline bool _Set_thread_name_preferred(void* const _Handle, const char* const _Name) noexcept {
+            // set the thread name by using SetThreadDescription()
+            using _Fn_t        = long(__stdcall*)(void*, const wchar_t*);
+            static _Fn_t _Func = []() noexcept -> _Fn_t { // load it once
+                const HMODULE _Module = ::GetModuleHandleW(L"Kernel32");
+                if (!_Module) [[unlikely]] { // module not loaded, break
+                    return nullptr;
+                }
+
+                // Note: The SetThreadDescription() function was introducated in Windows 10, version 1607.
+                //       While it's possible to check the Windows version to determine availibility,
+                //       a more robust approach is to attempt to load the function dynamically from
+                //       the Kernel32.dll library. If the function is present, its signature will be available,
+                //       allowing successful loading. Otherwise, GetProcAddress() will return a null-pointer.
+                return reinterpret_cast<_Fn_t>(::GetProcAddress(_Module, "SetThreadDescription"));
+            }();
+            if (!_Func) { // function not loaded, break
+                return false;
+            }
+
+            try {
+                // call within a try-catch block to handle potential allocation failure gracefully
+                const size_t _Size = ::strlen(_Name);
+                auto _Widen        = ::mjx::make_unique_smart_array<wchar_t>(_Size + 1);
+                mjsync_impl::_Narrow_to_widen(_Name, _Name + _Size, _Widen.get());
+                return SUCCEEDED(_Func(_Handle, _Widen.get()));
+            } catch (...) {
+                return false;
+            }
+        }
+
+        struct alignas(8) _Thread_name_info {
+            unsigned long _Type;
+            const char* _Name;
+            unsigned long _Thread_id;
+            unsigned long _Flags;
+        };
+
+        inline bool _Set_thread_name_fallback(void* const _Handle, const char* const _Name) noexcept {
+            // set the thread name by throwing an exception
+            _Thread_name_info _Info;
+            _Info._Type      = 0x1000; // must be 0x1000
+            _Info._Name      = _Name;
+            _Info._Thread_id = ::GetThreadId(_Handle);
+            _Info._Flags     = 0; // must be zero
+            __try {
+                // communicate with debugger by throwing a specially-configured exception
+                constexpr unsigned long _Code = 0x406D'1388;
+                ::RaiseException(_Code, 0, sizeof(_Thread_name_info) / sizeof(ULONG_PTR),
+                    reinterpret_cast<const ULONG_PTR*>(&_Info));
+                return false;
+            } __except (EXCEPTION_EXECUTE_HANDLER) {
+                return true; // expected behavior, treat it as a success
+            }
+        }
+
         inline size_t _Hardware_concurrency() noexcept {
             SYSTEM_INFO _Info = {0};
             ::GetSystemInfo(&_Info);

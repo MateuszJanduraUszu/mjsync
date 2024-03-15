@@ -40,6 +40,19 @@ namespace mjx {
             return _Myval;
         }
 
+        template <class _Visitor>
+        constexpr decltype(auto) visit(_Visitor&& _Vis) noexcept(noexcept(_Vis(::std::declval<_Ty&>()))) {
+            lock_guard _Guard(_Mylock);
+            return ::std::forward<_Visitor>(_Vis)(_Myval);
+        }
+
+        template <class _Visitor>
+        constexpr decltype(auto) visit(_Visitor&& _Vis) const
+            noexcept(noexcept(_Vis(::std::declval<const _Ty&>()))) {
+            shared_lock_guard _Guard(_Mylock);
+            return ::std::forward<_Visitor>(_Vis)(_Myval);
+        }
+
     private:
         _Ty _Myval;
         mutable shared_lock _Mylock;

@@ -35,17 +35,17 @@ namespace mjx {
                     return _Result_t::task_not_registered;
                 }
 
-                if (_Mytask->_State.load(::std::memory_order_relaxed) == task_state::canceled) {
+                if (_Mytask->_State.load(::std::memory_order_acquire) == task_state::canceled) {
                     return _Result_t::already_canceled;
                 }
 
-                _Mytask->_State.store(task_state::canceled, ::std::memory_order_relaxed);
+                _Mytask->_State.store(task_state::canceled, ::std::memory_order_release);
                 return _Result_t::success;
             }
 
             void _Wait_until_done() noexcept {
                 if (_Mytask) {
-                    switch (_Mytask->_State.load(::std::memory_order_relaxed)) {
+                    switch (_Mytask->_State.load(::std::memory_order_acquire)) {
                     case task_state::enqueued:
                     case task_state::running:
                         // worth waiting, do it

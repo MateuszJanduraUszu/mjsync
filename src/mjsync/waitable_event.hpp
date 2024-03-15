@@ -46,7 +46,7 @@ namespace mjx {
         // waits for the event, then resets it
         void wait_and_reset(const uint32_t _Timeout = infinite_timeout) noexcept;
 
-        // notifies a thread that waits for the thread
+        // notifies a thread that waits for the event
         void notify() noexcept;
 
         // resets the event

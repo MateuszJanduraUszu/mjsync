@@ -77,6 +77,9 @@ namespace mjx {
     };
 
     _MJSYNC_API size_t hardware_concurrency() noexcept;
+    _MJSYNC_API thread::id current_thread_id() noexcept;
+    _MJSYNC_API void yield_current_thread() noexcept;
+    _MJSYNC_API void sleep_for(const uintmax_t _Duration) noexcept;
 } // namespace mjx
 
 #endif // _MJSYNC_THREAD_HPP_

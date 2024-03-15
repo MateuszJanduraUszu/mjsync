@@ -141,4 +141,19 @@ namespace mjx {
         static const size_t _Count = mjsync_impl::_Hardware_concurrency();
         return _Count;
     }
+
+    thread::id current_thread_id() noexcept {
+        // retrieve the thread identifier of the calling thread
+        return ::GetCurrentThreadId();
+    }
+
+    void yield_current_thread() noexcept {
+        // yield execution to another thread that is ready to run on the current processor
+        ::SwitchToThread();
+    }
+
+    void sleep_for(const uintmax_t _Duration) noexcept {
+        // suspend the execution of the current thread until the time-out interval elapses
+        ::Sleep(static_cast<unsigned long>(_Duration));
+    }
 } // namespace mjx

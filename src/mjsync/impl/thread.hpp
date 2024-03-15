@@ -9,6 +9,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <mjmem/object_allocator.hpp>
+#include <mjmem/smart_pointer.hpp>
 #include <mjsync/impl/tinywin.hpp>
 #include <mjsync/impl/utils.hpp>
 #include <mjsync/srwlock.hpp>

@@ -50,6 +50,20 @@ namespace mjx {
         return _Myimpl ? _Myimpl->_Cache._Queue._Size() : 0;
     }
 
+    bool thread::set_name(const char* const _Name) noexcept {
+        if (state() == thread_state::terminated) {
+            return false;
+        }
+
+        void* const _Handle = _Myimpl->_Handle;
+        if (mjsync_impl::_Set_thread_name_preferred(_Handle, _Name)) { // preferred solution succeeded
+            return true;
+        }
+
+        // preferred solution failed, use fallback solution
+        return mjsync_impl::_Set_thread_name_fallback(_Handle, _Name);
+    }
+
     void thread::cancel_all_pending_tasks() noexcept {
         if (_Myimpl) {
             _Myimpl->_Cache._Queue._Clear();

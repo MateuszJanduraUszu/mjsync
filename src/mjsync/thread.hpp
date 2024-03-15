@@ -53,6 +53,9 @@ namespace mjx {
         // returns the number of pending tasks
         size_t pending_tasks() const noexcept;
 
+        // changes the thread's name
+        bool set_name(const char* const _Name) noexcept;
+
         // cancels all pending tasks
         void cancel_all_pending_tasks() noexcept;
 

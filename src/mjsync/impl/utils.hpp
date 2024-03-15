@@ -24,6 +24,14 @@ namespace mjx {
             ::abort();
 #endif // _DEBUG
         }
+
+        inline void _Narrow_to_widen(const char* _First, const char* const _Last, wchar_t* _Dest) noexcept {
+            for (; _First != _Last; ++_First, ++_Dest) {
+                *_Dest = static_cast<wchar_t>(*_First); // no encoding conversion is performed
+            }
+
+            *_Dest = L'\0'; // end with null-terminator
+        }
     } // namespace mjsync_impl
 } // namespace mjx
 

@@ -9,6 +9,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <mjmem/object_allocator.hpp>
+#include <mjmem/smart_pointer.hpp>
 #include <mjsync/impl/tinywin.hpp>
 #include <mjsync/impl/utils.hpp>
 #include <mjsync/srwlock.hpp>
@@ -18,14 +19,6 @@
 
 namespace mjx {
     namespace mjsync_impl {
-        inline void _Terminate_this_thread() noexcept {
-            ::ExitThread(0);
-        }
-        
-        inline void _Suspend_this_thread() noexcept {
-            ::SuspendThread(::GetCurrentThread());
-        }
-
         class _Queued_task {
         public:
             task::id _Id;
@@ -61,7 +54,7 @@ namespace mjx {
             _Queued_task& operator=(const _Queued_task&) = delete;
 
             bool _Should_execute() const noexcept {
-                return _State.load(::std::memory_order_relaxed) == task_state::enqueued;
+                return _State.load(::std::memory_order_acquire) == task_state::enqueued;
             }
 
             void _Execute() noexcept {
@@ -78,12 +71,12 @@ namespace mjx {
 
         private:
             void _Set_state(const task_state _New_state) noexcept {
-                _State.store(_New_state, ::std::memory_order_relaxed);
+                _State.store(_New_state, ::std::memory_order_release);
             }
 
             void _Steal_data(_Queued_task& _Other) noexcept {
                 _Id               = _Other._Id;
-                _State            = _Other._State.exchange(task_state::canceled);
+                _State            = _Other._State.exchange(task_state::canceled, ::std::memory_order_relaxed);
                 _Completion_event = ::std::move(_Other._Completion_event);
                 _Priority         = _Other._Priority;
                 _Callable         = _Other._Callable;
@@ -102,6 +95,9 @@ namespace mjx {
             ~_Task_queue() noexcept {
                 _Clear();
             }
+
+            _Task_queue(const _Task_queue&)            = delete;
+            _Task_queue& operator=(const _Task_queue&) = delete;
 
             bool _Empty() const noexcept {
                 shared_lock_guard _Guard(_Mylock);
@@ -230,11 +226,17 @@ namespace mjx {
         class _Thread_cache { // thread's internal cache
         public:
             ::std::atomic<thread_state> _State;
+            waitable_event _State_event; // event used for synchronization when state changes
+            waitable_event _Termination_event; // event used for synchronization at termination
             _Task_queue _Queue;
             _Task_counter _Counter;
 
             explicit _Thread_cache(const thread_state _Initial_state) noexcept
-                : _State(_Initial_state), _Queue(), _Counter() {}
+                : _State(_Initial_state), _State_event(), _Termination_event(), _Queue(), _Counter() {}
+
+            _Thread_cache()                                = delete;
+            _Thread_cache(const _Thread_cache&)            = delete;
+            _Thread_cache& operator=(const _Thread_cache&) = delete;
         };
 
         class _Thread_impl {
@@ -251,40 +253,37 @@ namespace mjx {
                 ::CloseHandle(_Handle);
             }
 
+            _Thread_impl(const _Thread_impl&)            = delete;
+            _Thread_impl& operator=(const _Thread_impl&) = delete;
+
             thread_state _Get_state() const noexcept {
-                return _Cache._State.load(::std::memory_order_relaxed);
+                return _Cache._State.load(::std::memory_order_acquire);
             }
 
             void _Set_state(const thread_state _New_state) noexcept {
-                _Cache._State.store(_New_state, ::std::memory_order_relaxed);
+                _Cache._State.store(_New_state, ::std::memory_order_release);
+            }
+
+            thread_state _Exchange_state(const thread_state _New_state) noexcept {
+                return _Cache._State.exchange(_New_state, ::std::memory_order_acq_rel);
             }
 
             _Queued_task* _Find_task(const task::id _Id) noexcept {
                 return _Cache._Queue._Find(_Id);
             }
 
-            void _Wait_until_terminated() noexcept {
-                ::WaitForSingleObject(_Handle, 0xFFFF'FFFF); // infinite timeout
-            }
-
-            bool _Suspend() noexcept {
-                return ::SuspendThread(_Handle) != 0xFFFF'FFFF;
-            }
-
-            bool _Resume() noexcept {
-                return ::ResumeThread(_Handle) != 0xFFFF'FFFF;
-            }
-
         private:
             static unsigned long __stdcall _Thread_routine(void* const _Data) noexcept {
                 _Thread_cache* const _Cache = static_cast<_Thread_cache*>(_Data);
-                for (;;) {
-                    switch (_Cache->_State.load(::std::memory_order_relaxed)) {
+                bool _Terminate             = false; // indicates whether termination has been requested
+                bool _Was_idle              = false; // indicates whether the thread was in an idle state
+                while (!_Terminate) {
+                    switch (_Cache->_State.load(::std::memory_order_acquire)) {
                     case thread_state::terminated: // end execution
-                        _Terminate_this_thread();
+                        _Terminate = true;
                         break;
                     case thread_state::waiting: // wait for any signal
-                        _Suspend_this_thread();
+                        _Cache->_State_event.wait_and_reset();
                         break;
                     case thread_state::working: // perform another task
                         if (!_Cache->_Queue._Empty()) {
@@ -292,8 +291,22 @@ namespace mjx {
                             if (_Task._Should_execute()) {
                                 _Task._Execute();
                             }
-                        } else { // no more tasks, wait for any
-                            _Cache->_State.store(thread_state::waiting, ::std::memory_order_relaxed);
+
+                            if (_Was_idle) { // got some task, reset the flag
+                                _Was_idle = false;
+                            }
+                        } else { // no more tasks
+                            // Note: The use of atomic operations here necessitates caution in changing the
+                            //       state, especially the first time when the thread has no tasks.
+                            //       Modifying the state in this critical section may result in a race condition,
+                            //       where a termination request is overwritten by the state change to 'waiting'.
+                            //       To prevent this, we use the _Was_idle flag to toggle the state only if the
+                            //       thread was previously in an idle state, avoiding a potential race condition.
+                            if (_Was_idle) {
+                                _Cache->_State.store(thread_state::waiting, ::std::memory_order_release);
+                            }
+
+                            _Was_idle = !_Was_idle; // toggle flag state
                         }
 
                         break;
@@ -303,6 +316,10 @@ namespace mjx {
                     }
                 }
                 
+                // Note: The termination request always originates from thread::terminate(), which subsequently
+                //       waits until the thread is fully terminated. It is crucial to notify the termination
+                //       process to prevent an indefinite wait.
+                _Cache->_Termination_event.notify();
                 return 0;
             }
 
@@ -317,6 +334,62 @@ namespace mjx {
                 }
             }
         };
+
+        inline bool _Set_thread_name_preferred(void* const _Handle, const char* const _Name) noexcept {
+            // set the thread name by using SetThreadDescription()
+            using _Fn_t        = long(__stdcall*)(void*, const wchar_t*);
+            static _Fn_t _Func = []() noexcept -> _Fn_t { // load it once
+                const HMODULE _Module = ::GetModuleHandleW(L"Kernel32");
+                if (!_Module) [[unlikely]] { // module not loaded, break
+                    return nullptr;
+                }
+
+                // Note: The SetThreadDescription() function was introducated in Windows 10, version 1607.
+                //       While it's possible to check the Windows version to determine availibility,
+                //       a more robust approach is to attempt to load the function dynamically from
+                //       the Kernel32.dll library. If the function is present, its signature will be available,
+                //       allowing successful loading. Otherwise, GetProcAddress() will return a null-pointer.
+                return reinterpret_cast<_Fn_t>(::GetProcAddress(_Module, "SetThreadDescription"));
+            }();
+            if (!_Func) { // function not loaded, break
+                return false;
+            }
+
+            try {
+                // call within a try-catch block to handle potential allocation failure gracefully
+                const size_t _Size = ::strlen(_Name);
+                auto _Widen        = ::mjx::make_unique_smart_array<wchar_t>(_Size + 1);
+                mjsync_impl::_Narrow_to_widen(_Name, _Name + _Size, _Widen.get());
+                return SUCCEEDED(_Func(_Handle, _Widen.get()));
+            } catch (...) {
+                return false;
+            }
+        }
+
+        struct alignas(8) _Thread_name_info {
+            unsigned long _Type;
+            const char* _Name;
+            unsigned long _Thread_id;
+            unsigned long _Flags;
+        };
+
+        inline bool _Set_thread_name_fallback(void* const _Handle, const char* const _Name) noexcept {
+            // set the thread name by throwing an exception
+            _Thread_name_info _Info;
+            _Info._Type      = 0x1000; // must be 0x1000
+            _Info._Name      = _Name;
+            _Info._Thread_id = ::GetThreadId(_Handle);
+            _Info._Flags     = 0; // must be zero
+            __try {
+                // communicate with debugger by throwing a specially-configured exception
+                constexpr unsigned long _Code = 0x406D'1388;
+                ::RaiseException(_Code, 0, sizeof(_Thread_name_info) / sizeof(ULONG_PTR),
+                    reinterpret_cast<const ULONG_PTR*>(&_Info));
+                return false;
+            } __except (EXCEPTION_EXECUTE_HANDLER) {
+                return true; // expected behavior, treat it as a success
+            }
+        }
 
         inline size_t _Hardware_concurrency() noexcept {
             SYSTEM_INFO _Info = {0};

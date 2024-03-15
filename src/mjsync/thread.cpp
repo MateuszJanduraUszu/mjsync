@@ -138,8 +138,8 @@ namespace mjx {
     }
 
     size_t hardware_concurrency() noexcept {
-        static const size_t _Count = mjsync_impl::_Hardware_concurrency();
-        return _Count;
+        // return the number of concurrent threads supported
+        return mjsync_impl::_Hardware_concurrency();
     }
 
     thread::id current_thread_id() noexcept {

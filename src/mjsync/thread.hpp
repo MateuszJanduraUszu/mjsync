@@ -60,14 +60,14 @@ namespace mjx {
         task schedule_task(const callable _Callable, void* const _Arg,
             const task_priority _Priority = task_priority::normal, const bool _Resume = true);
 
-        // terminates the thread (optinally waits)
-        bool terminate(const bool _Wait = true) noexcept;
-
         // suspends the thread
         bool suspend() noexcept;
 
         // resumes the thread
         bool resume() noexcept;
+
+        // terminates the thread
+        bool terminate() noexcept;
 
     private:
         friend task;

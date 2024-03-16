@@ -26,11 +26,14 @@ To integrate MJSYNC into your project, you can include the appropriate header fi
 based on your requirements:
 
 * **<mjsync/api.hpp>**: Export/import macro, don't include it directly.
-* **<mjsync/async.hpp>**: `async()` function.
+* **<mjsync/async.hpp>**: `async()` function for asynchronous execution of user-defined callables.
+* **<mjsync/shared_resource.hpp>**: Manages access to shared resources across multiple threads
 * **<mjsync/srwlock.hpp>**: Slim reader/writer lock (SRW Lock).
+* **<mjsync/sync_flag.hpp>**: Provides a thread-safe synchronization flag management.
+* **<mjsync/task.hpp>**: Observable scheduled task object.
 * **<mjsync/thread.hpp>**: Threads management.
-* **<mjsync/thread_pool.hpp>**: `thread-pool` class.
-* **<mjsync/waitable_event.hpp>**: `waitable_event` class.
+* **<mjsync/thread_pool.hpp>**: Manages multiple threads for asynchronous work execution.
+* **<mjsync/waitable_event.hpp>**: `waitable_event` class for multithreaded waiting and signaling mechanisms.
 
 ## Compatibility
 
